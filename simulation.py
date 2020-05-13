@@ -19,6 +19,8 @@ class particle:
     self.intro_epoch = intro_epoch
     self.DOF = DOF  #degree of freedom""""
     self.viral_state = False
+    self.is_death = False
+    self.disease_level = 0
 class shape:        
   def __init__(self,index = 0,position = [0.0,0.0],lenght = 1.0,angle = 0,intro_epoch = 0):
       self.index = index
@@ -46,7 +48,6 @@ class interaction:
                 if particles[self.ij[0]].viral_state ^ particles[self.ij[1]].viral_state:
                     #print([particles[self.ij[0]].viral_state, particles[self.ij[1]].viral_state])
                     get_sick = np.random.rand()<kwargs['contagion_prob']
-                    print(np.random.rand()<kwargs['contagion_prob'])
                     if particles[self.ij[0]].viral_state == False:
                         particles[self.ij[0]].viral_state = get_sick
                     else:
@@ -89,7 +90,10 @@ class simulation:
                                    ,contagion_prob = self.contagion_prob)
             else:
                 self.interactions[i].update(self.particles)
-          
+    def update_desease(self):
+        for part in self.particles:
+            pass
+        
             
     def integrator(self):
       """
@@ -129,6 +133,8 @@ class simulation:
     def run(self, times):
        for i in range(times):
            self.epoch = self.epoch + 1
+           # if self.viral_particles:
+           #     self.update_desease()
            self.update_interactions()
            self.integrator() 
 

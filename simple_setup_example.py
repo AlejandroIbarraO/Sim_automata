@@ -13,12 +13,14 @@ xdata, ydata = [], []
 simulation_size = 25
 nn = 50
 n_sick = 3
-S = simulation(boundary_len = simulation_size,boundary ='reflection',viral_particles= True)
-
+S = simulation(boundary_len = simulation_size,boundary ='periodic',viral_particles= True)
+S.time_step = .05
+S.contagion_prob = 0.1
+speed_m = 3.0
 x_pos = 1.9*simulation_size*(np.random.rand(nn)-0.5)
 y_pos = 1.9*simulation_size*(np.random.rand(nn)-0.5)
-x_vel = 20.0*(np.random.rand(nn)-0.5)
-y_vel = 20.0*(np.random.rand(nn)-0.5)
+x_vel = speed_m*(np.random.rand(nn)-0.5)
+y_vel = speed_m*(np.random.rand(nn)-0.5)
 sick = np.full(nn,False)
 sick[0:n_sick] = True
 np.random.shuffle(sick)
@@ -47,7 +49,7 @@ def plot_data(i):
     ax.set_xlim(-simulation_size, simulation_size)
     ax.set_ylim(-simulation_size, simulation_size)
     
-anim = FuncAnimation(fig, plot_data, init_func=init, frames = 10,interval = 10)
+anim = FuncAnimation(fig, plot_data, init_func=init, frames = 25,interval = 1)
 plt.show()
 
     
