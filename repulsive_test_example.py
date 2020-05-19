@@ -10,26 +10,27 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 fig, ax = plt.subplots()
 xdata, ydata = [], []
-simulation_size = 25
-nn = 20
-n_sick = 3
+simulation_size = 2
+nn = 2
+n_sick = 1
 S = simulation(boundary_len = simulation_size,boundary ='reflection',viral_particles= True)
-S.time_step = .1
+S.time_step = .05
+S.contagion_distance = 5.0
 S.contagion_prob = 0.1
-S.contagion_distance = 1.0
-speed_m = 0.0
-x_pos = 1.9*simulation_size*(np.random.rand(nn)-0.5)
-y_pos = 1.9*simulation_size*(np.random.rand(nn)-0.5)
-x_vel = speed_m*(np.random.rand(nn)-0.5)
-y_vel = speed_m*(np.random.rand(nn)-0.5)
+speed_m = 0.2
+angles = np.linspace(0,np.pi,nn)
+x_pos = np.cos(angles)
+y_pos = np.sin(angles)
+x_vel = -speed_m*np.cos(angles)
+y_vel = -speed_m*np.sin(angles)
 sick = np.full(nn,False)
-sick[0:n_sick] = True
-S.random_amp = 1.0
-
+sick[0:n_sick] = False
 np.random.shuffle(sick)
+S.random_walk = False
 for i in range(nn):
     S.add_particle(position = [x_pos[i],y_pos[i]], velocity = [x_vel[i],y_vel[i]], viral_state=sick[i])
-    S.particles[-1].charge = 0.01
+    S.particles[-1].charge = 1.0
+S.random_amp = 1.0
 def init():
     ax.set_xlim(-simulation_size, simulation_size)
     ax.set_ylim(-simulation_size, simulation_size)
