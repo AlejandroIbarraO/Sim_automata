@@ -26,6 +26,9 @@ class particle:
     self.force = [0.0,0.0]
     self.set_destiny = False
     self.destiny_position = [0.0,0.0]
+    self.destiny_intensity = 1.0
+    self.destiny_ofset = 2.0
+    
 class shape:        
   def __init__(self,index = 0,position = [0.0,0.0],lenght = 1.0,angle = 0,intro_epoch = 0):
       self.index = index
@@ -43,12 +46,17 @@ class interaction:
         self.rij_norm = [self.rij[0]/self.distance,self.rij[1]/self.distance]
         self.ij = [particle_i.index,particle_j.index]
         self.index = index
+        self.active_interaction = True
     def update(self,particles,**kwargs):
         self.rij = [particles[self.ij[0]].position[-1][0]-particles[self.ij[1]].position[-1][0],
                     particles[self.ij[0]].position[-1][1]-particles[self.ij[1]].position[-1][1]]
         self.distance = np.sqrt(np.square(self.rij[0])+np.square(self.rij[1]))
+        if self.distance<1e-6:
+            self.distance = 1e-5
         self.rij_norm = [self.rij[0]/self.distance,self.rij[1]/self.distance]
-        if 'contagion_distance' in kwargs.keys():
+        self.active_interaction = particles[self.ij[0]].is_death or particles[self.ij[0]].is_death
+        self.active_interaction = not(self.active_interaction)
+        if 'contagion_distance' in kwargs.keys() and self.active_interaction:
             if self.distance < kwargs['contagion_distance']:
                 particles[self.ij[0]].neighbors.append(self.index)
                 particles[self.ij[1]].neighbors.append(self.index)
@@ -81,6 +89,8 @@ class simulation:
         self.random_walk = True
         self.random_amp = 0.1
         self.viscose_damping = 1.0
+        self.append = False
+        self.death_probability = 0.01
     def add_particle(self,position,velocity,charge = 1.0, radius = 1.0, viral_state = False):
         self.particles.append(particle(len(self.particles),position,velocity,charge,radius,self.epoch))
         self.particles[-1].viral_state = viral_state
@@ -103,82 +113,108 @@ class simulation:
                 self.interactions[i].update(self.particles)
     def update_particles(self):
         for part in self.particles:
+            """
+            sickness status - !down with the sickness!
+            """
+           
+            if part.viral_state == True:
+                if part.disease_level == 0:
+                    part.disease_level = 1
+                elif part.disease_level == 1 or part.disease_level == 2:
+                    part.disease_level = part.disease_level+np.random.randint(-1,2)
+                elif part.disease_level == 3:
+                    part.is_death = np.random.rand()<self.death_probability 
+                    part.disease_level = part.disease_level+np.random.randint(-1,0)
+                    if part.is_death:
+                        part.disease_level = 4
+                    else:
+                        part.disease_level = part.disease_level+np.random.randint(-1,0)
             part.force[0] = 0.0
             part.force[1] = 0.0
             """
             repulsive_central_force   ---> social distance == contagion_distance
             """
             if part.charge != 0.0:
-                #print(part.neighbors)
-                for index in part.neighbors:
-                    if part.index == self.interactions[index].ij[1]:
-                        #print(part.index==self.interactions[index].ij[1])
-                        part.force[0] = part.force[0]-part.charge*self.interactions[index].rij_norm[0]#/np.square(self.interactions[index].distance)
-                        part.force[1] = part.force[1]-part.charge*self.interactions[index].rij_norm[1]#/np.square(self.interactions[index].distance)
-                    else:
-                        #print(part.index==self.interactions[index].ij[1])
-                        part.force[0] = part.force[0]+part.charge*self.interactions[index].rij_norm[0]#/np.square(self.interactions[index].distance)
-                        part.force[1] = part.force[1]+part.charge*self.interactions[index].rij_norm[1]#/np.square(self.interactions[index].distance)      
-            """
-            central_force to one place of the space actractive !!!
-            """
-            if part.set_destiny == True:
-                part.force[0] = part.force[0] + part.destiny_position[0]-part.position[-1][0]
-                part.force[1] = part.force[1] + part.destiny_position[1]-part.position[-1][1]
-            """
-            random force
-            """
-            if self.random_walk == True:
-                angle = np.random.rand()*2*np.pi
-                part.force[0] = part.force[0] + self.random_amp*np.cos(angle)
-                part.force[1] = part.force[1] + self.random_amp*np.sin(angle)
-            """
-            viscose force
-                
-            """
-            speed_magnitude = np.sqrt(np.square(part.speed[-1][0])+np.square(part.speed[-1][1]))
-            part.force[0] = part.force[0] - self.viscose_damping*part.speed[-1][0]*np.power(speed_magnitude,3/2)
-            part.force[1] = part.force[1] - self.viscose_damping*part.speed[-1][1]*np.power(speed_magnitude,3/2)
-            #print(part.force)
-            """
-            status de la enfermedad
+                if len(part.neighbors)>0:
+                    for index in part.neighbors:   
+                        if part.index == self.interactions[index].ij[1]:
+                            #print(part.index==self.interactions[index].ij[1])
+                            part.force[0] = part.force[0]-part.charge*self.interactions[index].rij_norm[0]#/np.square(self.interactions[index].distance)
+                            part.force[1] = part.force[1]-part.charge*self.interactions[index].rij_norm[1]#/np.square(self.interactions[index].distance)
+                        else:
+                            #print(part.index==self.interactions[index].ij[1])
+                            part.force[0] = part.force[0]+part.charge*self.interactions[index].rij_norm[0]#/np.square(self.interactions[index].distance)
+                            part.force[1] = part.force[1]+part.charge*self.interactions[index].rij_norm[1]#/np.square(self.interactions[index].distance)             
             
-            """
+            if part.is_death == False:
+                """
+                central_force to one place of the space actractive !!!
+                """
+                if part.set_destiny == True:
+                    distance =  np.sqrt(np.square(part.destiny_position[0]-part.position[-1][0])+
+                                        np.square(part.destiny_position[1]-part.position[-1][1]))
+                    if distance > part.destiny_ofset:
+                        part.force[0] = part.force[0] + part.destiny_intensity*(part.destiny_position[0]-part.position[-1][0])/distance
+                        part.force[1] = part.force[1] + part.destiny_intensity*(part.destiny_position[1]-part.position[-1][1])/distance
+                """
+                random force
+                """
+                if self.random_walk == True:
+                    angle = np.random.rand()*2*np.pi
+                    part.force[0] = part.force[0] + self.random_amp*np.cos(angle)
+                    part.force[1] = part.force[1] + self.random_amp*np.sin(angle)
+                """
+                viscose force
+                    
+                """
+                speed_magnitude = np.sqrt(np.square(part.speed[-1][0])+np.square(part.speed[-1][1]))
+                part.force[0] = part.force[0] - self.viscose_damping*part.speed[-1][0]*np.power(speed_magnitude,3/2)
+                part.force[1] = part.force[1] - self.viscose_damping*part.speed[-1][1]*np.power(speed_magnitude,3/2)
+        ##print(part.force)
+
+                    
+                    
     def integrator(self):
       """
       Add a interaction manager, who calculate the net force over the particle i
       the comunication variable must be f_c
       """
       for i in range(len(self.particles)):
-          f_x = self.particles[i].force[0]  
-          f_y = self.particles[i].force[1]
-          if self.particles[i].DOF[0] == True:
-            v_x = f_x*self.time_step + self.particles[i].speed[-1][0]
-          else:
-            v_x = self.particles[i].velocity[-1][0]
-          if self.particles[i].DOF[1]== True:
-            v_y = f_y*self.time_step + self.particles[i].speed[-1][1]
-          else:
-            v_y = self.particles[i].velocity[-1][1]
-          p_x = v_x*self.time_step + self.particles[i].position[-1][0]
-          p_y = v_y*self.time_step + self.particles[i].position[-1][1]
-          """
-          Add a shape cross detector detector a corrector 
-          """
-          self.particles[i].speed.append([v_x,v_y])
-          self.particles[i].position.append([p_x,p_y])
-          self.particles[i].neighbors = []
-          """
-          Boundary system detector-corrector
-          """
-          if self.boundary_interaction != 'none':
-            for j in range(2):
-              if abs(self.particles[i].position[-1][j])>self.boundary_len:
-                if self.boundary_interaction == 'reflection':
-                   self.particles[i].position[-1][j] = self.boundary_len * self.particles[i].position[-1][j] / abs(self.particles[i].position[-1][j])
-                   self.particles[i].speed[-1][j] = self.particles[i].speed[-1][0] * -1.0
-                elif self.boundary_interaction == 'periodic': 
-                   self.particles[i].position[-1][j] = -1 * self.boundary_len * self.particles[i].position[-1][j] / abs(self.particles[i].position[-1][j])
+          if self.particles[i].is_death == False:
+              f_x = self.particles[i].force[0]  
+              f_y = self.particles[i].force[1]
+              if self.particles[i].DOF[0] == True:
+                v_x = f_x*self.time_step + self.particles[i].speed[-1][0]
+              else:
+                v_x = self.particles[i].velocity[-1][0]
+              if self.particles[i].DOF[1]== True:
+                v_y = f_y*self.time_step + self.particles[i].speed[-1][1]
+              else:
+                v_y = self.particles[i].velocity[-1][1]
+              p_x = v_x*self.time_step + self.particles[i].position[-1][0]
+              p_y = v_y*self.time_step + self.particles[i].position[-1][1]
+              """
+              Add a shape cross detector detector a corrector 
+              """
+              if self.append == True:
+                  self.particles[i].speed.append([v_x,v_y])
+                  self.particles[i].position.append([p_x,p_y])
+              else:
+                  
+                  self.particles[i].speed = [[v_x,v_y]]
+                  self.particles[i].position = [[p_x,p_y]]            
+                  self.particles[i].neighbors = []
+              """
+              Boundary system detector-corrector
+              """
+              if self.boundary_interaction != 'none':
+                for j in range(2):
+                  if abs(self.particles[i].position[-1][j])>self.boundary_len:
+                    if self.boundary_interaction == 'reflection':
+                       self.particles[i].position[-1][j] = self.boundary_len * self.particles[i].position[-1][j] / abs(self.particles[i].position[-1][j])
+                       self.particles[i].speed[-1][j] = self.particles[i].speed[-1][0] * -1.0
+                    elif self.boundary_interaction == 'periodic': 
+                       self.particles[i].position[-1][j] = -1 * self.boundary_len * self.particles[i].position[-1][j] / abs(self.particles[i].position[-1][j])
 
     def run(self, times):
        for i in range(times):
@@ -196,5 +232,5 @@ class simulation:
            try:
                self.integrator() 
            except:
-               print('updatee_error')
+               print('integrate_error')
 
